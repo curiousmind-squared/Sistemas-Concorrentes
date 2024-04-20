@@ -6,6 +6,10 @@
 #include <sys/time.h>
 #include <sys/wait.h>
 
+struct proc {
+	int num;
+	int PID;
+}
 
 int main () {
 	
@@ -44,6 +48,7 @@ int main () {
 
 		for (size_t iter=0; iter<num_of_iter; iter++) {
 
+			printf("Eu sou o processo %d. PID: %d. No passo %ld.", );// Vou dormir por %f segundos\n");
 		}
 
 	} else {
