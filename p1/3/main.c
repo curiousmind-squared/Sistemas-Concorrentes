@@ -8,7 +8,10 @@
 #include <sys/wait.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <semaphore.h> 
+#include <fcntl.h>
 
+#define SEM_NAME "/semaphore"
 
 typedef struct {
     int primeira_var;
@@ -34,6 +37,7 @@ int main () {
 	int filhos[num_of_filhos]; // Para os PID's dos filhos
 	int num_filho[num_of_filhos]; // Para termos o número do filho (0, 1 ou 2)
 
+	sem_t *sem; // Semáforo para evitar a condição de corrida
 
 	// Toda essa área abaixo é relativa à criação da área de memória compartilhada
 
@@ -41,13 +45,21 @@ int main () {
 	if (shm_id < 0) {
         	perror("shmget");
         	exit(1);
-    	}
+    }
 	
     	data = (shared_data *)shmat(shm_id, NULL, 0);
 	if (data == (void *) -1) {
         	perror("shmat");
 	        exit(1);
-    	}
+    }
+
+	// Toda essa área abaixo é relativa à criação do semáforo
+	sem_unlink(SEM_NAME); // Para caso exista semáforos abertos com o próprio nome
+    sem = sem_open(SEM_NAME, O_CREAT | O_EXCL, 0644, 1);
+    if (sem == SEM_FAILED) {
+        perror("sem_open");
+        exit(EXIT_FAILURE);
+    }
 	
 	// Inicializa os valores das variaveis compartilhadas
 	data->primeira_var = 0;
@@ -97,6 +109,8 @@ int main () {
 			§  Copia “de volta” para a primeira variável compartilhada
 			§  Decremente a segunda variável compartilhada (diretamente na memória compartilhada)
 			§  Dorme mais um tempo. (aleatório)
+		 * P1.3:
+		 * - Resolve o problema na "primeira_var" com semáforos
 		 */
 
 		double media, desv_prd, values= 0;
@@ -117,10 +131,12 @@ int main () {
 			printf("Valor das variveis compartilhadas, filho %d alterando:\nVariavel 1: %d\nVariavel 2: %d\n",filho_pos_nasc, data->primeira_var, data->segunda_var);
 
 			int tempo_de_dormir_1 = (rand() % 96) + 5;
-			int tmp_var = data->primeira_var;
-			tmp_var++;
-			usleep(tempo_de_dormir_1*1000);
-			data->primeira_var = tmp_var;
+			sem_wait(sem); // Parte relativa a p1.3
+				int tmp_var = data->primeira_var;
+				tmp_var++;
+				usleep(tempo_de_dormir_1*1000);
+				data->primeira_var = tmp_var;
+			sem_post(sem); // Parte relativa a p1.3
 
 			int tempo_de_dormir_2 = (rand() % 96) + 5;
 			data->segunda_var--;
@@ -162,13 +178,15 @@ int main () {
 
 		// Finaliza a medição do tempo
 		gettimeofday(&end, NULL);
-	        long duration = (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) / 1000;
+	    long duration = (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) / 1000;
 		printf("\nTodos os filhos terminaram. Processamento teve a duração de %ldms\n", duration);	
 
 		// Libera o espaço de memória
 		shmdt(data);
 		// Destroe o segmento de memória compartilhada
 		shmctl(shm_id, IPC_RMID, NULL);
+		// Destroe o semaphore
+		sem_unlink(SEM_NAME);
 	}
 
 
