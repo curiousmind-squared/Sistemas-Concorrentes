@@ -12,6 +12,7 @@
 #include <fcntl.h>
 
 #define SEM_NAME "/semaphore"
+#define SEM_NAME2 "/semaphore2"
 
 typedef struct {
     int primeira_var;
@@ -38,6 +39,7 @@ int main () {
 	int num_filho[num_of_filhos]; // Para termos o número do filho (0, 1 ou 2)
 
 	sem_t *sem; // Semáforo para evitar a condição de corrida
+	sem_t *sem2;
 
 	// Toda essa área abaixo é relativa à criação da área de memória compartilhada
 
@@ -60,6 +62,13 @@ int main () {
         perror("sem_open");
         exit(EXIT_FAILURE);
     }
+    	sem_unlink(SEM_NAME2); // Para caso exista semáforos abertos com o próprio nome
+    	sem2 = sem_open(SEM_NAME2, O_CREAT | O_EXCL, 0644, 1);
+    	if (sem2 == SEM_FAILED) {
+        	perror("sem_open");
+        	exit(EXIT_FAILURE);
+    	}
+
 	
 	// Inicializa os valores das variaveis compartilhadas
 	data->primeira_var = 0;
@@ -139,8 +148,10 @@ int main () {
 			sem_post(sem); // Parte relativa a p1.3
 
 			int tempo_de_dormir_2 = (rand() % 96) + 5;
-			data->segunda_var--;
-			usleep(tempo_de_dormir_2*1000);
+			sem_wait(sem2);
+				data->segunda_var--;
+				usleep(tempo_de_dormir_2*1000);
+			sem_post(sem2);
 		}
 
 
